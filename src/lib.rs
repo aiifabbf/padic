@@ -2,6 +2,7 @@ use std::{
     cmp::Ordering,
     collections::VecDeque,
     iter::{once, repeat},
+    ops::Not,
 };
 
 #[cfg(test)]
@@ -39,24 +40,37 @@ mod tests {
         }
     }
 
+    fn bits(v: i8) -> impl Iterator<Item = Bit> {
+        v.to_le_bytes()
+            .into_iter()
+            .map(|byte| {
+                (0..8).map(move |i| {
+                    if (byte.wrapping_shr(i) & 1) == 1 {
+                        Bit::I
+                    } else {
+                        Bit::O
+                    }
+                })
+            })
+            .flatten()
+    }
+
     #[test]
     fn bits_match_every_i8() {
         for v in i8::MIN..=i8::MAX {
             let two_adic = TwoAdic::from(v as i32);
             let two_adic_bits = two_adic.bits().take(8);
-            let i8_bits = v
-                .to_le_bytes()
-                .into_iter()
-                .map(|byte| {
-                    (0..8).map(move |i| {
-                        if (byte.wrapping_shr(i) & 1) == 1 {
-                            Bit::I
-                        } else {
-                            Bit::O
-                        }
-                    })
-                })
-                .flatten();
+            let i8_bits = bits(v);
+            assert!(two_adic_bits.zip(i8_bits).all(|(a, b)| a == b), "{:?}", v);
+        }
+    }
+
+    #[test]
+    fn bitwise_negation() {
+        for v in i8::MIN..=i8::MAX {
+            let two_adic = !TwoAdic::from(v as i32);
+            let two_adic_bits = two_adic.bits().take(8);
+            let i8_bits = bits(!v);
             assert!(two_adic_bits.zip(i8_bits).all(|(a, b)| a == b), "{:?}", v);
         }
     }
@@ -66,6 +80,17 @@ mod tests {
 enum Bit {
     O,
     I,
+}
+
+impl Not for Bit {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::I => Self::O,
+            Self::O => Self::I,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,6 +221,19 @@ impl From<i32> for TwoAdic {
                 let bits = bits_reversed.into_iter().rev().collect();
                 Self::IO(bits)
             }
+        }
+    }
+}
+
+impl Not for TwoAdic {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::OI(bits) => Self::IO(bits.into_iter().map(Not::not).collect()),
+            Self::II => Self::OO,
+            Self::OO => Self::II,
+            Self::IO(bits) => Self::OI(bits.into_iter().map(Not::not).collect()),
         }
     }
 }
