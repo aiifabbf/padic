@@ -10,28 +10,17 @@ mod tests {
 
     #[test]
     fn ordering() {
-        let integers = [
-            TwoAdic::OI([Bit::O, Bit::O].into()), // 000111... = -8
-            TwoAdic::OI([Bit::O].into()),         // 0011... = -4
-            TwoAdic::OI([Bit::I].into()),         // 1011... = -3
-            TwoAdic::OI([].into()),               // 0111... = -2
-            TwoAdic::II,                          // 1111... = -1
-            TwoAdic::OO,                          // 0000... = 0
-            TwoAdic::IO([].into()),               // 1000... = 1
-            TwoAdic::IO([Bit::O].into()),         // 0100... = 2
-            TwoAdic::IO([Bit::I].into()),         // 1100... = 3
-            TwoAdic::IO([Bit::I, Bit::I].into()), // 1110... = 7
-        ];
+        let integers = (i8::MIN..=i8::MAX).map(|v| TwoAdic::from(v as i32));
 
-        for (i, v) in integers.iter().enumerate() {
-            for w in integers.iter().skip(i) {
+        for (i, v) in integers.clone().enumerate() {
+            for w in integers.clone().skip(i) {
                 assert!(v <= w, "{:?} <= {:?}", v, w);
             }
         }
     }
 
     #[test]
-    fn from_i32() {
+    fn from_typical_i32() {
         let integers = [
             (-8, TwoAdic::OI([Bit::O, Bit::O].into())), // 000111... = -8
             (-4, TwoAdic::OI([Bit::O].into())),         // 0011... = -4
@@ -47,6 +36,28 @@ mod tests {
 
         for (f, t) in integers.into_iter() {
             assert_eq!(TwoAdic::from(f), t);
+        }
+    }
+
+    #[test]
+    fn bits_match_every_i8() {
+        for v in i8::MIN..=i8::MAX {
+            let two_adic = TwoAdic::from(v as i32);
+            let two_adic_bits = two_adic.bits().take(8);
+            let i8_bits = v
+                .to_le_bytes()
+                .into_iter()
+                .map(|byte| {
+                    (0..8).map(move |i| {
+                        if (byte.wrapping_shr(i) & 1) == 1 {
+                            Bit::I
+                        } else {
+                            Bit::O
+                        }
+                    })
+                })
+                .flatten();
+            assert!(two_adic_bits.zip(i8_bits).all(|(a, b)| a == b), "{:?}", v);
         }
     }
 }
